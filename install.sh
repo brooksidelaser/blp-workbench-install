@@ -77,7 +77,7 @@ PUBLIC_URL=${REPLY%/}
 ask "Version to run (a tag such as v0.66b, or latest)" latest
 VERSION=$REPLY
 SEED=false
-if yes_no "Add fictional demo data to try things out?" n; then SEED=true; fi
+if yes_no "Set this up as a demo installation (a fictional shop, removable later)?" n; then SEED=true; fi
 
 # The app runs as this host user and group, which must own the data folder.
 if [ "$(id -u)" = 0 ]; then DEF_UID=1000 DEF_GID=1000; else DEF_UID=$(id -u) DEF_GID=$(id -g); fi

@@ -47,7 +47,7 @@ The installer asks for:
   subfolder with its name (default `~/blp-workbench`), which must not have an install yet;
 - the port and the address people will open;
 - the version (a tag such as `v0.66b`, or `latest`);
-- whether to add demo data (fictional records for trying things out);
+- whether to set it up as a demo installation (Paper Street Soap Company, a fictional shop, with its look and records; removable later in Admin › Maintenance);
 - the user and group ids the app runs as (default: you), which own its data folder;
 - your GitHub username and token, if the machine isn't signed in to ghcr.io yet.
 
