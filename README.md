@@ -42,10 +42,13 @@ bash install.sh
 
 The installer asks for:
 
-- the install folder (default `~/blp-workbench`);
+- an instance name (default `blp-workbench`; use another, e.g. `blp-workbench-test`, to run a
+  second instance on the same machine) and the folder to install into: the instance goes in a
+  subfolder with its name (default `~/blp-workbench`);
 - the port and the address people will open;
 - the version (a tag such as `v0.66b`, or `latest`);
 - whether to add demo data (fictional records for trying things out);
+- the user and group ids the app runs as (default: you), which own its data folder;
 - your GitHub username and token, if the machine isn't signed in to ghcr.io yet.
 
 It then writes `compose.yaml` and `.env`, and starts the app. Open the address it prints. A new
@@ -54,7 +57,7 @@ walks you through the setup.
 
 ## Update
 
-Run the installer again and choose the same folder: it pulls the version set in `.env` (you can
+Run the installer again with the same instance name and folder: it pulls the version set in `.env` (you can
 change it) and restarts. Your data stays in `data/`; the app backs it up before updating its
 database.
 
