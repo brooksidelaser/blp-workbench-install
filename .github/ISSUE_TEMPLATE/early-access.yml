@@ -1,0 +1,25 @@
+name: Request early access
+description: Ask Brookside Laser for access to the BLP Workbench image.
+title: 'Early access request: '
+labels: ['early access']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Brookside Laser grants access to the GitHub account that opens this request, so you
+        don't need to type your username. You'll get a reply here when access is granted.
+        Don't post tokens or passwords here: issues are public.
+  - type: input
+    id: name
+    attributes:
+      label: Name or business
+      description: Who you are (optional).
+    validations:
+      required: false
+  - type: textarea
+    id: use
+    attributes:
+      label: How you'd like to use BLP Workbench
+      description: A sentence or two about your shop or what you'd like to try (optional).
+    validations:
+      required: false

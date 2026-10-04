@@ -1,0 +1,33 @@
+name: Feedback or problem
+description: Questions, problems and ideas for BLP Workbench.
+labels: ['feedback']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Issues are public: don't include customer names, prices, passwords or other private
+        details. Screenshots are welcome if they show nothing private.
+  - type: dropdown
+    id: kind
+    attributes:
+      label: Kind
+      options:
+        - Problem
+        - Question
+        - Idea
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Shown at the bottom of the app's pages, e.g. v0.66b.
+    validations:
+      required: true
+  - type: textarea
+    id: details
+    attributes:
+      label: Details
+      description: What happened (or what you'd like), and the steps to see it.
+    validations:
+      required: true

@@ -6,10 +6,11 @@ Sets up BLP Workbench on a machine with Docker.
 
 ### 1. Request early access
 
-BLP Workbench is in early access. Provide your GitHub username to Brookside Laser and request
-early access to BLP Workbench. Once access is granted, your GitHub account can download the BLP
-Workbench image. (No GitHub account yet? Create one for free at
-[github.com/signup](https://github.com/signup).)
+BLP Workbench is in early access. Sign in to GitHub (no account yet? Create one for free at
+[github.com/signup](https://github.com/signup)), then
+[open an early access request](https://github.com/brooksidelaser/blp-workbench-install/issues/new?template=early-access.yml)
+to Brookside Laser. Access is granted to the GitHub account that opens the request, and you'll
+get a reply on the request when your account can download the BLP Workbench image.
 
 ### 2. Create a GitHub token for downloading the image
 
@@ -66,5 +67,6 @@ folder, edit `.env`, sign in once with
 
 ## Feedback
 
-Send questions, problems and ideas to Brookside Laser, with the version shown at the bottom of
-the app's pages.
+[Open a feedback issue](https://github.com/brooksidelaser/blp-workbench-install/issues/new?template=feedback.yml)
+for questions, problems and ideas, with the version shown at the bottom of the app's pages.
+Issues are public, so leave out customer names, prices, passwords and other private details.
