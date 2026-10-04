@@ -4,7 +4,8 @@
 services:
   app:
     image: ghcr.io/brooksidelaser/blp-workbench:${BLP_VERSION:-latest}
-    container_name: blp-workbench
+    # One name per instance on this machine (CONTAINER_NAME in .env).
+    container_name: ${CONTAINER_NAME:-blp-workbench}
     init: true
     restart: unless-stopped
     # The user the app runs as must own ./data on the host. Default: the image's own user

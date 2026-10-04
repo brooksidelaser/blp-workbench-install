@@ -30,12 +30,32 @@ docker info >/dev/null 2>&1 ||
 
 say "BLP Workbench installer"
 
-ask "Install folder" "$HOME/blp-workbench"
-DIR=$REPLY
+# Instance name: the container's name and the install folder's name (several instances can run
+# side by side, e.g. blp-workbench and blp-workbench-test).
+ROOT_DEFAULT=$HOME
+while true; do
+  ask "Instance name (letters, digits, - _ . ; no spaces)" blp-workbench
+  NAME=$REPLY
+  if ! [[ $NAME =~ ^[A-Za-z0-9][A-Za-z0-9_.-]*$ ]]; then
+    echo "Use letters, digits, - _ or . only (starting with a letter or digit)."
+    continue
+  fi
+  ask "Folder to install into (the instance goes in a subfolder named $NAME)" "$ROOT_DEFAULT"
+  ROOT=${REPLY%/}
+  ROOT_DEFAULT=$ROOT
+  DIR="$ROOT/$NAME"
+  # That folder already has this install: update it (below).
+  [ -f "$DIR/.env" ] && [ -f "$DIR/compose.yaml" ] && break
+  if docker ps -a --format '{{.Names}}' | grep -qx "$NAME"; then
+    echo "A container named $NAME already exists (another install). Choose another instance name."
+    continue
+  fi
+  break
+done
 mkdir -p "$DIR"
 cd "$DIR"
 
-# ---- Update an existing install
+# ---- Update an existing install (the folder already has one)
 if [ -f .env ] && [ -f compose.yaml ]; then
   say "Found an install in $DIR."
   if yes_no "Update it to the version in .env (pull and restart)?" y; then
@@ -50,10 +70,17 @@ if [ -f .env ] && [ -f compose.yaml ]; then
 fi
 
 # ---- Questions
+port_free() { ! (ss -ltn 2>/dev/null || netstat -ltn 2>/dev/null) | awk '{print $4}' | grep -qE "[:.]$1\$"; }
+PORT_GUESS=7080
+while ! port_free "$PORT_GUESS" && [ "$PORT_GUESS" -lt 7180 ]; do PORT_GUESS=$((PORT_GUESS + 1)); done
 HOST_GUESS=$(hostname -I 2>/dev/null | awk '{print $1}')
 HOST_GUESS=${HOST_GUESS:-$(hostname)}
-ask "Port on this machine" 7080
-PORT=$REPLY
+while true; do
+  ask "Port on this machine" "$PORT_GUESS"
+  PORT=$REPLY
+  [[ $PORT =~ ^[0-9]+$ ]] && port_free "$PORT" && break
+  echo "Port $PORT is not a number or is already in use."
+done
 ask "Address people will open (used in QR codes and links)" "http://$HOST_GUESS:$PORT"
 PUBLIC_URL=${REPLY%/}
 ask "Version to run (a tag such as v0.66b, or latest)" latest
@@ -61,13 +88,18 @@ VERSION=$REPLY
 SEED=false
 if yes_no "Add fictional demo data to try things out?" n; then SEED=true; fi
 
-UID_=$(id -u)
-GID_=$(id -g)
-if [ "$UID_" = 0 ]; then
-  say "Running as root: the app will use user 1000:1000 for its data folder."
-  UID_=1000
-  GID_=1000
-fi
+# The app runs as this host user and group, which must own the data folder.
+if [ "$(id -u)" = 0 ]; then DEF_UID=1000 DEF_GID=1000; else DEF_UID=$(id -u) DEF_GID=$(id -g); fi
+say "The app runs as a user and group on this machine that own its data folder."
+echo "The default is $([ "$(id -u)" = 0 ] && echo "1000:1000" || echo "you ($(id -un), $DEF_UID:$DEF_GID)")."
+while true; do
+  ask "User id" "$DEF_UID"
+  UID_=$REPLY
+  ask "Group id" "$DEF_GID"
+  GID_=$REPLY
+  [[ $UID_ =~ ^[0-9]+$ && $GID_ =~ ^[0-9]+$ ]] && break
+  echo "Ids are numbers (see: id <username>)."
+done
 
 # ---- Files
 say "Writing compose.yaml and .env in $DIR"
@@ -75,6 +107,7 @@ curl -fsSL "$REPO_RAW/compose.yaml" -o compose.yaml
 curl -fsSL "$REPO_RAW/.env.example" -o .env.example
 sed \
   -e "s|^BLP_VERSION=.*|BLP_VERSION=$VERSION|" \
+  -e "s|^CONTAINER_NAME=.*|CONTAINER_NAME=$NAME|" \
   -e "s|^APP_PORT=.*|APP_PORT=$PORT|" \
   -e "s|^# APP_UID=.*|APP_UID=$UID_|" \
   -e "s|^# APP_GID=.*|APP_GID=$GID_|" \
@@ -83,7 +116,17 @@ sed \
 if [ "$SEED" = true ]; then sed -i.bak 's/^# SEED_DEMO=true/SEED_DEMO=true/' .env && rm -f .env.bak; fi
 chmod 600 .env
 mkdir -p data
-if [ "$(id -u)" = 0 ]; then chown "$UID_:$GID_" data; fi
+# The data folder must belong to the app's user: change its owner if that's someone else.
+if [ "$(stat -c %u:%g data)" != "$UID_:$GID_" ]; then
+  if [ "$(id -u)" = 0 ]; then
+    chown "$UID_:$GID_" data
+  elif command -v sudo >/dev/null; then
+    echo "Giving $DIR/data to $UID_:$GID_ (sudo may ask for your password)."
+    sudo chown "$UID_:$GID_" data || fail "Couldn't change the owner. Run: sudo chown $UID_:$GID_ $DIR/data"
+  else
+    fail "Change the data folder's owner first: chown $UID_:$GID_ $DIR/data (as root), then run the installer again."
+  fi
+fi
 
 # ---- Registry sign-in (the image is private)
 if ! docker pull -q "$IMAGE:$VERSION" >/dev/null 2>&1; then
