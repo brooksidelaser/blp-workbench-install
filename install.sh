@@ -3,7 +3,8 @@
 #   curl -fsSLO https://raw.githubusercontent.com/brooksidelaser/blp-workbench-install/main/install.sh
 #   bash install.sh
 # It asks a few questions, writes compose.yaml and .env, signs in to the image registry if
-# needed, then pulls and starts the app. Run it again in the same folder to update.
+# needed, then pulls and starts the app. To update later:
+#   cd <install folder> && docker compose pull && docker compose up -d
 set -euo pipefail
 
 REPO_RAW="https://raw.githubusercontent.com/brooksidelaser/blp-workbench-install/main"
@@ -44,8 +45,12 @@ while true; do
   ROOT=${REPLY%/}
   ROOT_DEFAULT=$ROOT
   DIR="$ROOT/$NAME"
-  # That folder already has this install: update it (below).
-  [ -f "$DIR/.env" ] && [ -f "$DIR/compose.yaml" ] && break
+  if [ -f "$DIR/.env" ] || [ -f "$DIR/compose.yaml" ]; then
+    echo "$DIR already has an install. To update it:"
+    echo "  cd $DIR && docker compose pull && docker compose up -d"
+    echo "Choose another instance name or folder for a new install."
+    continue
+  fi
   if docker ps -a --format '{{.Names}}' | grep -qx "$NAME"; then
     echo "A container named $NAME already exists (another install). Choose another instance name."
     continue
@@ -54,20 +59,6 @@ while true; do
 done
 mkdir -p "$DIR"
 cd "$DIR"
-
-# ---- Update an existing install (the folder already has one)
-if [ -f .env ] && [ -f compose.yaml ]; then
-  say "Found an install in $DIR."
-  if yes_no "Update it to the version in .env (pull and restart)?" y; then
-    ask "Version to run (a tag such as v0.66b, or latest)" "$(sed -n 's/^BLP_VERSION=//p' .env)"
-    sed -i.bak "s/^BLP_VERSION=.*/BLP_VERSION=$REPLY/" .env && rm -f .env.bak
-    curl -fsSL "$REPO_RAW/compose.yaml" -o compose.yaml
-    docker compose pull && docker compose up -d
-    say "Updated. The app keeps its data in $DIR/data (a backup is made first when the database changes)."
-    exit 0
-  fi
-  fail "Nothing changed."
-fi
 
 # ---- Questions
 port_free() { ! (ss -ltn 2>/dev/null || netstat -ltn 2>/dev/null) | awk '{print $4}' | grep -qE "[:.]$1\$"; }
@@ -156,4 +147,7 @@ if curl -fs "http://localhost:$PORT/api/health" >/dev/null 2>&1; then
 else
   say "The app hasn't answered yet. Check: docker compose logs (in $DIR)"
 fi
-echo "Install folder: $DIR (data in $DIR/data). Run this installer again there to update."
+echo "Install folder: $DIR (data in $DIR/data)."
+echo
+echo "To update:"
+echo "  cd $DIR && docker compose pull && docker compose up -d"

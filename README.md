@@ -44,7 +44,7 @@ The installer asks for:
 
 - an instance name (default `blp-workbench`; use another, e.g. `blp-workbench-test`, to run a
   second instance on the same machine) and the folder to install into: the instance goes in a
-  subfolder with its name (default `~/blp-workbench`);
+  subfolder with its name (default `~/blp-workbench`), which must not have an install yet;
 - the port and the address people will open;
 - the version (a tag such as `v0.66b`, or `latest`);
 - whether to add demo data (fictional records for trying things out);
@@ -57,9 +57,14 @@ walks you through the setup.
 
 ## Update
 
-Run the installer again with the same instance name and folder: it pulls the version set in `.env` (you can
-change it) and restarts. Your data stays in `data/`; the app backs it up before updating its
-database.
+In the install folder (the installer prints it at the end):
+
+```sh
+cd ~/blp-workbench && docker compose pull && docker compose up -d
+```
+
+To move to a specific version, set `BLP_VERSION` in `.env` first (e.g. `v0.66b`, or `latest`).
+Your data stays in `data/`; the app backs it up before updating its database.
 
 ## By hand
 
