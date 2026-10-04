@@ -1,0 +1,17 @@
+# BLP Workbench (production). Copy this file and .env.example (as .env) into the install folder
+# (e.g. /docker/blp-workbench), then: docker compose pull && docker compose up -d
+# See docs/DOCKER.md.
+services:
+  app:
+    image: ghcr.io/brooksidelaser/blp-workbench:${BLP_VERSION:-latest}
+    container_name: blp-workbench
+    init: true
+    restart: unless-stopped
+    # The user the app runs as must own ./data on the host. Default: the image's own user
+    # (1000:1000); set APP_UID / APP_GID in .env to use another host user.
+    user: '${APP_UID:-1000}:${APP_GID:-1000}'
+    env_file: .env
+    ports:
+      - '${APP_PORT:-7080}:7080'
+    volumes:
+      - ./data:/data
