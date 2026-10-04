@@ -24,6 +24,11 @@ body:
       description: Shown at the bottom of the app's pages, e.g. v0.66b.
     validations:
       required: true
+  - type: input
+    id: page
+    attributes:
+      label: Page
+      description: The app page this is about (filled in when sent from the app's Feedback button).
   - type: textarea
     id: details
     attributes:
