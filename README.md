@@ -47,13 +47,19 @@ The installer asks for:
   subfolder with its name (default `~/blp-workbench`), which must not have an install yet;
 - the port and the address people will open;
 - the version (a tag such as `v0.66b`, or `latest`);
-- whether to set it up as a demo installation (Paper Street Soap Company, a fictional shop, with its look and records; removable later in Admin › Maintenance);
+- whether to set it up as a demo installation (Paper Street Soap Company, a fictional shop, with
+  its look and records; removable later in Admin › Maintenance);
 - the user and group ids the app runs as (default: you), which own its data folder;
 - your GitHub username and token, if the machine isn't signed in to ghcr.io yet.
 
 It then writes `compose.yaml` and `.env`, and starts the app. Open the address it prints. A new
 install asks you to create the administrator account, or to restore a backup instead, and then
 walks you through the setup.
+
+If it stops before the app is started (for example because your GitHub account hasn't been given
+access yet, or you press Ctrl+C), it removes the folders, files and containers it made, so you
+can simply run it again. Your sign-in to ghcr.io is kept, so the next try doesn't ask for the
+token again.
 
 ## Update
 

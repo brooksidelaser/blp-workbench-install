@@ -22,6 +22,38 @@ yes_no() { # yes_no "Question" y|n -> 0 for yes
 }
 fail() { printf '\n\033[31m%s\033[0m\n' "$*" >&2; exit 1; }
 
+# ---- Rollback: if setup stops before the app is started (an error, no access to the image,
+# Ctrl+C), undo what this run did, so running the installer again starts clean. Only what it
+# created goes: folders and files it made, and containers it started. A registry sign-in stays
+# (the next try then doesn't ask for the token again).
+CREATED=()
+STARTED=false
+FINISHED=false
+# Explicit return values: in a trap handler, a bare "return" gives the status from before the
+# trap (the failure), which would stop the clean-up early.
+remove() {
+  if rm -rf "$1" 2>/dev/null; then return 0; fi
+  # The app (another user) may have written into the data folder.
+  if command -v sudo >/dev/null && sudo rm -rf "$1"; then return 0; fi
+  echo "Couldn't remove $1; remove it by hand (sudo rm -rf $1)."
+  return 0
+}
+rollback() {
+  local code=$?
+  set +e
+  if [ "$FINISHED" = true ] || [ ${#CREATED[@]} -eq 0 ]; then return; fi
+  say "Setup didn't finish. Undoing what it did, so you can run the installer again."
+  if [ "$STARTED" = true ]; then
+    (cd "$DIR" && docker compose down --remove-orphans >/dev/null 2>&1) || true
+  fi
+  cd /
+  for ((i = ${#CREATED[@]} - 1; i >= 0; i--)); do remove "${CREATED[i]}"; done
+  echo "Cleaned up. Fix the problem above, then run: bash install.sh"
+  exit "$code"
+}
+trap rollback EXIT
+trap 'exit 130' INT TERM
+
 # ---- Requirements
 command -v docker >/dev/null || fail "Docker is not installed (https://docs.docker.com/engine/install/)."
 docker compose version >/dev/null 2>&1 || fail "The Docker Compose plugin is missing (docker compose)."
@@ -57,8 +89,15 @@ while true; do
   fi
   break
 done
+# Remember the topmost folder this run creates (a rollback removes it with what's inside).
+TOP=""
+p=$DIR
+while [ ! -e "$p" ]; do TOP=$p; p=$(dirname "$p"); done
 mkdir -p "$DIR"
+[ -n "$TOP" ] && CREATED+=("$TOP")
 cd "$DIR"
+# In a folder that was already there, only the files written below are removed on a rollback.
+own() { [ -z "$TOP" ] && [ ! -e "$DIR/$1" ] && CREATED+=("$DIR/$1"); return 0; }
 
 # ---- Questions
 port_free() { ! (ss -ltn 2>/dev/null || netstat -ltn 2>/dev/null) | awk '{print $4}' | grep -qE "[:.]$1\$"; }
@@ -94,8 +133,9 @@ done
 
 # ---- Files
 say "Writing compose.yaml and .env in $DIR"
-curl -fsSL "$REPO_RAW/compose.yaml" -o compose.yaml
-curl -fsSL "$REPO_RAW/.env.example" -o .env.example
+own compose.yaml && own .env.example && own .env && own data
+curl -fsSL "$REPO_RAW/compose.yaml" -o compose.yaml || fail "Couldn't download compose.yaml."
+curl -fsSL "$REPO_RAW/.env.example" -o .env.example || fail "Couldn't download .env.example."
 sed \
   -e "s|^BLP_VERSION=.*|BLP_VERSION=$VERSION|" \
   -e "s|^CONTAINER_NAME=.*|CONTAINER_NAME=$NAME|" \
@@ -129,14 +169,19 @@ if ! docker pull -q "$IMAGE:$VERSION" >/dev/null 2>&1; then
   read -rsp "Token: " GH_TOKEN </dev/tty
   echo
   echo "$GH_TOKEN" | docker login ghcr.io -u "$GH_USER" --password-stdin >/dev/null ||
-    fail "Sign-in failed. Check the username and token (read:packages), and that you were given access."
+    fail "Sign-in failed. Check the username and token (read:packages)."
   unset GH_TOKEN
+  docker pull -q "$IMAGE:$VERSION" >/dev/null 2>&1 ||
+    fail "Signed in, but $IMAGE:$VERSION can't be downloaded. Check that your GitHub account was given access to it, and that version $VERSION exists."
 fi
 
 # ---- Start
 say "Starting BLP Workbench (the first start takes a moment)"
-docker compose pull
-docker compose up -d
+docker compose pull || fail "Couldn't download the app's image."
+STARTED=true
+docker compose up -d || fail "Couldn't start the app."
+# Started: from here on nothing is undone (a slow first start isn't a failure).
+FINISHED=true
 for _ in $(seq 1 60); do
   if curl -fs "http://localhost:$PORT/api/health" >/dev/null 2>&1; then break; fi
   sleep 2
