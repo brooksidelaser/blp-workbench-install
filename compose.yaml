@@ -13,6 +13,7 @@ services:
     user: '${APP_UID:-1000}:${APP_GID:-1000}'
     env_file: .env
     ports:
-      - '${APP_PORT:-7080}:7080'
+      - '${APP_PORT:-7080}:7080' # HTTP (port 80 for Let's Encrypt)
+      - '${APP_HTTPS_PORT:-7443}:7443' # HTTPS (port 443), once Settings › HTTPS has a certificate
     volumes:
       - ./data:/data

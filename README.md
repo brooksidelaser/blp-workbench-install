@@ -45,10 +45,12 @@ The installer asks for:
 - an instance name (default `blp-workbench`; use another, e.g. `blp-workbench-test`, to run a
   second instance on the same machine) and the folder to install into: the instance goes in a
   subfolder with its name (default `~/blp-workbench`), which must not have an install yet;
-- the port and the address people will open;
+- a domain name for HTTPS (optional): with one that points at this machine, and ports 80 and 443
+  free here and reachable from the internet, the app gets a free Let's Encrypt certificate by
+  itself and is opened at `https://<domain>`. Leave it empty to skip (HTTPS can be set up later
+  in Admin › Settings › HTTPS);
+- without a domain: the port, and the address people will open;
 - the version (a tag such as `v0.66b`, or `latest`);
-- whether to set it up as a demo installation (Paper Street Soap Company, a fictional shop, with
-  its look and records; removable later in Admin › Maintenance);
 - the user and group ids the app runs as (default: you), which own its data folder;
 - your GitHub username and token, if the machine isn't signed in to ghcr.io yet.
 
@@ -71,6 +73,14 @@ cd ~/blp-workbench && docker compose pull && docker compose up -d
 
 To move to a specific version, set `BLP_VERSION` in `.env` first (e.g. `v0.66b`, or `latest`).
 Your data stays in `data/`; the app backs it up before updating its database.
+
+### HTTPS on an existing install
+
+Installs from before v0.72b have no HTTPS port in `compose.yaml`. Download the current
+[compose.yaml](compose.yaml) into the install folder, add `APP_HTTPS_PORT=443` (or another free
+port) to `.env`, then run `docker compose up -d` and choose a certificate in Admin › Settings ›
+HTTPS. For Let's Encrypt, also set `APP_PORT=80`, and set `PUBLIC_URL=https://<domain>`
+once the certificate works.
 
 ## By hand
 

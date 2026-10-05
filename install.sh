@@ -105,18 +105,52 @@ PORT_GUESS=7080
 while ! port_free "$PORT_GUESS" && [ "$PORT_GUESS" -lt 7180 ]; do PORT_GUESS=$((PORT_GUESS + 1)); done
 HOST_GUESS=$(hostname -I 2>/dev/null | awk '{print $1}')
 HOST_GUESS=${HOST_GUESS:-$(hostname)}
+# HTTPS with Let's Encrypt: needs a domain name pointing at this machine, with ports 80 and 443
+# reachable from the internet (the app then gets and renews its certificate by itself).
+say "HTTPS"
+echo "With a domain name that points at this machine (ports 80 and 443 reachable from the"
+echo "internet), the app gets a free Let's Encrypt certificate by itself. Without one, HTTPS"
+echo "can be set up later in the app (Admin › Settings › HTTPS)."
+DOMAIN=""
+TLS_EMAIL=""
 while true; do
-  ask "Port on this machine" "$PORT_GUESS"
-  PORT=$REPLY
-  [[ $PORT =~ ^[0-9]+$ ]] && port_free "$PORT" && break
-  echo "Port $PORT is not a number or is already in use."
+  ask "Domain name for HTTPS (leave empty to skip)" ""
+  DOMAIN=$(printf '%s' "$REPLY" | tr '[:upper:]' '[:lower:]')
+  [ -z "$DOMAIN" ] && break
+  if ! [[ $DOMAIN =~ ^([a-z0-9]([a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,63}$ ]]; then
+    echo "Enter a domain name such as workbench.example.com (not an IP address), or leave it empty."
+    continue
+  fi
+  if ! port_free 80 || ! port_free 443; then
+    echo "Ports 80 and 443 must be free on this machine for Let's Encrypt. Leave the domain empty to skip."
+    continue
+  fi
+  break
 done
-ask "Address people will open (used in QR codes and links)" "http://$HOST_GUESS:$PORT"
+if [ -n "$DOMAIN" ]; then
+  PORT=80
+  HTTPS_PORT=443
+  ask "Email for certificate expiry notices (optional)" ""
+  TLS_EMAIL=$REPLY
+  URL_GUESS="https://$DOMAIN"
+else
+  while true; do
+    ask "Port on this machine" "$PORT_GUESS"
+    PORT=$REPLY
+    [[ $PORT =~ ^[0-9]+$ ]] && port_free "$PORT" && break
+    echo "Port $PORT is not a number or is already in use."
+  done
+  # HTTPS (served once the app has a certificate): the next free port from 7443.
+  HTTPS_PORT=7443
+  while { ! port_free "$HTTPS_PORT" || [ "$HTTPS_PORT" = "$PORT" ]; } && [ "$HTTPS_PORT" -lt 7543 ]; do
+    HTTPS_PORT=$((HTTPS_PORT + 1))
+  done
+  URL_GUESS="http://$HOST_GUESS:$PORT"
+fi
+ask "Address people will open (used in QR codes and links)" "$URL_GUESS"
 PUBLIC_URL=${REPLY%/}
 ask "Version to run (a tag such as v0.66b, or latest)" latest
 VERSION=$REPLY
-SEED=false
-if yes_no "Set this up as a demo installation (a fictional shop, removable later)?" n; then SEED=true; fi
 
 # The app runs as this host user and group, which must own the data folder.
 if [ "$(id -u)" = 0 ]; then DEF_UID=1000 DEF_GID=1000; else DEF_UID=$(id -u) DEF_GID=$(id -g); fi
@@ -140,11 +174,14 @@ sed \
   -e "s|^BLP_VERSION=.*|BLP_VERSION=$VERSION|" \
   -e "s|^CONTAINER_NAME=.*|CONTAINER_NAME=$NAME|" \
   -e "s|^APP_PORT=.*|APP_PORT=$PORT|" \
+  -e "s|^APP_HTTPS_PORT=.*|APP_HTTPS_PORT=$HTTPS_PORT|" \
   -e "s|^# APP_UID=.*|APP_UID=$UID_|" \
   -e "s|^# APP_GID=.*|APP_GID=$GID_|" \
   -e "s|^PUBLIC_URL=.*|PUBLIC_URL=$PUBLIC_URL|" \
   .env.example >.env
-if [ "$SEED" = true ]; then sed -i.bak 's/^# SEED_DEMO=true/SEED_DEMO=true/' .env && rm -f .env.bak; fi
+if [ -n "$DOMAIN" ]; then
+  sed -i.bak -e "s|^# TLS_DOMAIN=.*|TLS_DOMAIN=$DOMAIN|" -e "s|^# TLS_EMAIL=.*|TLS_EMAIL=$TLS_EMAIL|" .env && rm -f .env.bak
+fi
 chmod 600 .env
 mkdir -p data
 # The data folder must belong to the app's user: change its owner if that's someone else.
@@ -189,6 +226,11 @@ done
 if curl -fs "http://localhost:$PORT/api/health" >/dev/null 2>&1; then
   say "Done. Open $PUBLIC_URL"
   echo "A new install asks you to create the administrator account (or restore a backup)."
+  if [ -n "$DOMAIN" ]; then
+    echo "The app is getting its HTTPS certificate for $DOMAIN, which takes a minute. If"
+    echo "https://$DOMAIN doesn't open, check that $DOMAIN points at this machine and that"
+    echo "ports 80 and 443 reach it, then see Admin › Settings › HTTPS (or http://$DOMAIN)."
+  fi
 else
   say "The app hasn't answered yet. Check: docker compose logs (in $DIR)"
 fi
