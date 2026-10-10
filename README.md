@@ -72,7 +72,21 @@ cd ~/blp-workbench && docker compose pull && docker compose up -d
 ```
 
 To move to a specific version, set `BLP_VERSION` in `.env` first (e.g. `v0.66b`, or `latest`).
-Your data stays in `data/`; the app backs it up before updating its database.
+Your data stays in the install (the database in its own container and volume, files in
+`data/`); the app backs it up before updating its database.
+
+### From v0.74b or earlier (the move to PostgreSQL)
+
+Since v0.80b the data is in a PostgreSQL database container instead of a file. To bring an older
+install over:
+
+1. If it's older than v0.74b, update it to v0.74b first (`BLP_VERSION=v0.74b` in `.env`, then the
+   update command). In the app, **Admin › Backup & Restore › Create backup**, and keep the file.
+2. Download the current [compose.yaml](compose.yaml) into the install folder, and add a line
+   `POSTGRES_PASSWORD=` with a long random password of letters and digits to `.env` (for example
+   from `openssl rand -hex 24`). Set `BLP_VERSION` to the new version or `latest`.
+3. Run the update command. The app starts empty: choose **Restore a backup** and upload the
+   backup from step 1.
 
 ### HTTPS on an existing install
 
@@ -85,7 +99,8 @@ once the certificate works.
 ## By hand
 
 The same files are in this repository: copy `compose.yaml` and `.env.example` (as `.env`) into a
-folder, edit `.env`, sign in once with
+folder, edit `.env` (set `POSTGRES_PASSWORD` to a long random password of letters and digits
+before the first start), sign in once with
 `echo <token> | docker login ghcr.io -u <GitHub username> --password-stdin`, then run
 `docker compose pull && docker compose up -d`.
 

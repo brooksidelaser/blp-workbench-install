@@ -44,7 +44,7 @@ rollback() {
   if [ "$FINISHED" = true ] || [ ${#CREATED[@]} -eq 0 ]; then return; fi
   say "Setup didn't finish. Undoing what it did, so you can run the installer again."
   if [ "$STARTED" = true ]; then
-    (cd "$DIR" && docker compose down --remove-orphans >/dev/null 2>&1) || true
+    (cd "$DIR" && docker compose down --volumes --remove-orphans >/dev/null 2>&1) || true
   fi
   cd /
   for ((i = ${#CREATED[@]} - 1; i >= 0; i--)); do remove "${CREATED[i]}"; done
@@ -178,6 +178,7 @@ sed \
   -e "s|^# APP_UID=.*|APP_UID=$UID_|" \
   -e "s|^# APP_GID=.*|APP_GID=$GID_|" \
   -e "s|^PUBLIC_URL=.*|PUBLIC_URL=$PUBLIC_URL|" \
+  -e "s|^POSTGRES_PASSWORD=.*|POSTGRES_PASSWORD=$(od -An -N24 -tx1 /dev/urandom | tr -d ' \n')|" \
   .env.example >.env
 if [ -n "$DOMAIN" ]; then
   sed -i.bak -e "s|^# TLS_DOMAIN=.*|TLS_DOMAIN=$DOMAIN|" -e "s|^# TLS_EMAIL=.*|TLS_EMAIL=$TLS_EMAIL|" .env && rm -f .env.bak
