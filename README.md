@@ -84,9 +84,11 @@ install over:
    update command). In the app, **Admin › Backup & Restore › Create backup**, and keep the file.
 2. Download the current [compose.yaml](compose.yaml) into the install folder, and add a line
    `POSTGRES_PASSWORD=` with a long random password of letters and digits to `.env` (for example
-   from `openssl rand -hex 24`). Set `BLP_VERSION` to the new version or `latest`.
+   from `openssl rand -hex 24`). Set `BLP_VERSION=v0.80b`, the version that brings v0.74b backups
+   over.
 3. Run the update command. The app starts empty: choose **Restore a backup** and upload the
    backup from step 1.
+4. Set `BLP_VERSION` to the newest version or `latest` and run the update command again.
 
 ### HTTPS on an existing install
 
