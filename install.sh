@@ -190,17 +190,20 @@ if [ -n "$DOMAIN" ]; then
   sed -i.bak -e "s|^# TLS_DOMAIN=.*|TLS_DOMAIN=$DOMAIN|" -e "s|^# TLS_EMAIL=.*|TLS_EMAIL=$TLS_EMAIL|" .env && rm -f .env.bak
 fi
 if [ "$UPDATER" = true ]; then
-  # Rootless Docker has its socket in the user's runtime folder.
+  # The socket of the Docker this install runs on: the one this docker command talks to
+  # (DOCKER_HOST, or the current context; e.g. rootless Docker's in the user's runtime folder).
+  ENDPOINT=${DOCKER_HOST:-$(docker context inspect -f '{{.Endpoints.docker.Host}}' 2>/dev/null)}
   SOCKET=/var/run/docker.sock
-  if docker info -f '{{.SecurityOptions}}' 2>/dev/null | grep -q rootless; then
-    SOCKET=${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/docker.sock
-  fi
+  case $ENDPOINT in unix://*) [ -S "${ENDPOINT#unix://}" ] && SOCKET=${ENDPOINT#unix://} ;; esac
   sed -i.bak \
     -e "s|^# COMPOSE_PROFILES=.*|COMPOSE_PROFILES=updater|" \
     -e "s|^# INSTALL_DIR=.*|INSTALL_DIR=$(pwd)|" \
     -e "s|^# DOCKER_CONFIG_DIR=.*|DOCKER_CONFIG_DIR=${DOCKER_CONFIG:-$HOME/.docker}|" \
-    -e "s|^# DOCKER_SOCKET=.*|DOCKER_SOCKET=$SOCKET|" \
     .env && rm -f .env.bak
+  # Only when it isn't the usual one.
+  if [ "$SOCKET" != /var/run/docker.sock ] && [ "$SOCKET" != /run/docker.sock ]; then
+    sed -i.bak -e "s|^# DOCKER_SOCKET=.*|DOCKER_SOCKET=$SOCKET|" .env && rm -f .env.bak
+  fi
 fi
 chmod 600 .env
 mkdir -p data
