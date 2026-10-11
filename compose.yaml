@@ -3,7 +3,7 @@
 # See docs/DOCKER.md.
 services:
   app:
-    image: ghcr.io/brooksidelaser/blp-workbench:${BLP_VERSION:-latest}
+    image: ${BLP_IMAGE:-ghcr.io/brooksidelaser/blp-workbench}:${BLP_VERSION:-latest}
     # One name per instance on this machine (CONTAINER_NAME in .env).
     container_name: ${CONTAINER_NAME:-blp-workbench}
     init: true
@@ -48,6 +48,41 @@ services:
     volumes:
       - db:/var/lib/postgresql
       - db-socket:/var/run/postgresql
+  # The updater (optional; COMPOSE_PROFILES=updater in .env turns it on): carries out the updates
+  # and restarts started in Admin › Updates, and gives Brookside's staff the app's and the
+  # database's logs (and, when you allow it, a shell) during support access. It has the Docker
+  # socket, which means full control of Docker on this machine, so it publishes no port, takes
+  # requests only from the app (through files and a socket in ./data/updates that only the app's
+  # user can open), accepts nothing but a release to update to (checked against blpworkbench.com's
+  # digest), a restart, and logs or a shell of this install's app and db containers, and its code
+  # is in its image (the release's -updater image). It sees the install folder at its own path
+  # (INSTALL_DIR) to edit BLP_VERSION in .env, and signs in to the image registry with this
+  # machine's Docker login (DOCKER_CONFIG_DIR, read-only).
+  updater:
+    image: ${BLP_IMAGE:-ghcr.io/brooksidelaser/blp-workbench}:${BLP_VERSION:-latest}-updater
+    container_name: ${CONTAINER_NAME:-blp-workbench}-updater
+    profiles: [updater]
+    init: true
+    restart: unless-stopped
+    environment:
+      # The mounted socket, whatever context the machine's Docker login names.
+      DOCKER_HOST: unix:///var/run/docker.sock
+      # Without INSTALL_DIR, the updater stops and says so.
+      INSTALL_DIR: ${INSTALL_DIR:-}
+      APP_UID: ${APP_UID:-1000}
+      APP_GID: ${APP_GID:-1000}
+      BLP_IMAGE: ${BLP_IMAGE:-ghcr.io/brooksidelaser/blp-workbench}
+      DOCKER_SOCKET: ${DOCKER_SOCKET:-/var/run/docker.sock}
+    volumes:
+      # DOCKER_SOCKET: rootless Docker's socket instead (e.g. /run/user/1000/docker.sock).
+      - ${DOCKER_SOCKET:-/var/run/docker.sock}:/var/run/docker.sock
+      - ${INSTALL_DIR:-.}:${INSTALL_DIR:-/install}
+      - type: bind
+        source: ${DOCKER_CONFIG_DIR:-/root/.docker}/config.json
+        target: /root/.docker/config.json
+        read_only: true
+        bind:
+          create_host_path: false
 volumes:
   db:
   db-socket:

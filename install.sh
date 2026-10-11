@@ -151,6 +151,12 @@ ask "Address people will open (used in QR codes and links)" "$URL_GUESS"
 PUBLIC_URL=${REPLY%/}
 ask "Version to run (a tag such as v0.66b, or latest)" latest
 VERSION=$REPLY
+say "Updates from the app (Admin › Updates) need the updater: a small extra container that"
+echo "downloads a new version and restarts the app when an admin asks, and shows Brookside the"
+echo "app's logs during support access (and a shell, only if you allow it then). It has access to"
+echo "Docker on this machine. Without it, you update with a command instead."
+UPDATER=false
+yes_no "Allow updates from the app?" y && UPDATER=true
 
 # The app runs as this host user and group, which must own the data folder.
 if [ "$(id -u)" = 0 ]; then DEF_UID=1000 DEF_GID=1000; else DEF_UID=$(id -u) DEF_GID=$(id -g); fi
@@ -183,6 +189,19 @@ sed \
 if [ -n "$DOMAIN" ]; then
   sed -i.bak -e "s|^# TLS_DOMAIN=.*|TLS_DOMAIN=$DOMAIN|" -e "s|^# TLS_EMAIL=.*|TLS_EMAIL=$TLS_EMAIL|" .env && rm -f .env.bak
 fi
+if [ "$UPDATER" = true ]; then
+  # Rootless Docker has its socket in the user's runtime folder.
+  SOCKET=/var/run/docker.sock
+  if docker info -f '{{.SecurityOptions}}' 2>/dev/null | grep -q rootless; then
+    SOCKET=${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/docker.sock
+  fi
+  sed -i.bak \
+    -e "s|^# COMPOSE_PROFILES=.*|COMPOSE_PROFILES=updater|" \
+    -e "s|^# INSTALL_DIR=.*|INSTALL_DIR=$(pwd)|" \
+    -e "s|^# DOCKER_CONFIG_DIR=.*|DOCKER_CONFIG_DIR=${DOCKER_CONFIG:-$HOME/.docker}|" \
+    -e "s|^# DOCKER_SOCKET=.*|DOCKER_SOCKET=$SOCKET|" \
+    .env && rm -f .env.bak
+fi
 chmod 600 .env
 mkdir -p data
 # The data folder must belong to the app's user: change its owner if that's someone else.
@@ -213,6 +232,17 @@ if ! docker pull -q "$IMAGE:$VERSION" >/dev/null 2>&1; then
     fail "Signed in, but $IMAGE:$VERSION can't be downloaded. Check that your GitHub account was given access to it, and that version $VERSION exists."
 fi
 
+# The updater signs in to the registry with this machine's Docker login (its config.json).
+if [ "$UPDATER" = true ]; then
+  CONFIG=${DOCKER_CONFIG:-$HOME/.docker}/config.json
+  [ -f "$CONFIG" ] || { mkdir -p "$(dirname "$CONFIG")" && echo '{}' >"$CONFIG"; }
+  if grep -q '"credsStore"' "$CONFIG"; then
+    echo "Note: Docker keeps this machine's registry passwords in a credential helper, which the"
+    echo "updater can't use. If updates from the app can't download, sign in once more with"
+    echo "\"credsStore\" removed from $CONFIG (see the help page Installing and updating)."
+  fi
+fi
+
 # ---- Start
 say "Starting BLP Workbench (the first start takes a moment)"
 docker compose pull || fail "Couldn't download the app's image."
@@ -237,5 +267,9 @@ else
 fi
 echo "Install folder: $DIR (data in $DIR/data)."
 echo
-echo "To update:"
+if [ "$UPDATER" = true ]; then
+  echo "Updates: in the app, Admin › Updates. Or by hand:"
+else
+  echo "To update:"
+fi
 echo "  cd $DIR && docker compose pull && docker compose up -d"

@@ -65,7 +65,10 @@ token again.
 
 ## Update
 
-In the install folder (the installer prints it at the end):
+If you allowed updates from the app when installing, update in **Admin › Updates**: it lists
+newer releases with what's new, saves a backup and updates with one click (through the small
+`updater` container). Otherwise, or by hand, in the install folder (the installer prints it at
+the end):
 
 ```sh
 cd ~/blp-workbench && docker compose pull && docker compose up -d
